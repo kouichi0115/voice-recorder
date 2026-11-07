@@ -63,7 +63,7 @@ export function renderSettings(root: HTMLElement, ctx: AppContext): () => void {
       h("section", { class: "panel" },
         h("h2", null, "要約（Claude）"),
         h("p", { class: "muted small" },
-          "要約には Anthropic の Claude API を使います。API キーは ",
+          "Claude による詳しい要約に使います（未設定でも、端末内の簡易要約は使えます）。API キーは ",
           h("a", { href: "https://platform.claude.com/", target: "_blank", rel: "noopener" }, "Claude Console"),
           " で発行できます。"),
         keyField("Anthropic API キー", "anthropicApiKey", ctx, "sk-ant-..."),

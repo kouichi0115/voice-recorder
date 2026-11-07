@@ -23,6 +23,8 @@ export type TranscriptSource = "none" | "live" | "whisper";
 
 export interface Summary {
   text: string;
+  /** "claude": Claude で作成 / "local": API キー無しで端末内で作成した簡易要約（未設定の古いデータは claude） */
+  kind?: "claude" | "local";
   model: string;
   createdAt: number;
   instruction?: string;

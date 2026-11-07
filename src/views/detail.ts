@@ -3,8 +3,9 @@ import { extensionFor } from "../lib/audio";
 import { deleteRecording, getAudio, getRecording, updateRecording } from "../lib/db";
 import { append, clear, copyText, h, icon, toast } from "../lib/dom";
 import { canShareFiles, downloadBlob, safeFileName, shareOrDownload } from "../lib/export/save";
-import { toMarkdown, toPlainText, toSrt } from "../lib/export/text";
+import { summaryLabel, toMarkdown, toPlainText, toSrt } from "../lib/export/text";
 import { newId } from "../lib/id";
+import { LOCAL_SUMMARY_LABEL, localSummary } from "../lib/localSummary";
 import { markdownToHtml } from "../lib/markdown";
 import { formatDateTime, formatDurationJa, timestampFormatter } from "../lib/time";
 import { activeSegmentIndex, normalizeSegments, sortMarkers, transcriptLines } from "../lib/transcript";
@@ -301,6 +302,9 @@ export function renderDetail(root: HTMLElement, ctx: AppContext, id: string): ()
 
     function renderSummary() {
       const s = ctx.settings();
+      // API キーがあれば Claude、無ければ端末内の簡易要約
+      const useClaude = !!s.anthropicApiKey;
+      const isLocal = rec.summary?.kind === "local";
       const hasTranscript = rec.segments.length > 0;
       const instructionBox = h("textarea", {
         class: "instruction",
@@ -319,18 +323,25 @@ export function renderDetail(root: HTMLElement, ctx: AppContext, id: string): ()
           h("button", { class: "btn", type: "button", onclick: () => summaryAbort?.abort() }, "中止"),
         );
       } else {
+        const label = useClaude
+          ? !rec.summary ? "要約する" : isLocal ? "Claudeで要約する" : "要約し直す"
+          : rec.summary ? "簡易要約を作り直す" : "簡易要約を作成";
+        const primary = !rec.summary || (useClaude && isLocal);
         append(toolbar, [
-          h("button", { class: rec.summary ? "btn" : "btn primary", type: "button", onclick: runSummary, disabled: !hasTranscript },
-            icon("sparkles", 18), rec.summary ? "要約し直す" : "要約する"),
+          h("button", {
+            class: primary ? "btn primary" : "btn", type: "button",
+            onclick: useClaude ? runSummary : runLocalSummary, disabled: !hasTranscript,
+          }, icon("sparkles", 18), label),
           rec.summary && h("button", { class: "btn", type: "button", onclick: () => copyText(rec.summary!.text) }, icon("copy", 18), "コピー"),
         ]);
       }
       panel.append(toolbar);
-      if (!summarizing) panel.append(details);
+      if (!summarizing && useClaude) panel.append(details);
 
-      if (!s.anthropicApiKey && !summarizing) {
+      if (!useClaude && !summarizing) {
         panel.append(h("p", { class: "hint-box" },
-          "要約には Claude を使います。", h("a", { href: "#/settings" }, "設定"), "で Anthropic API キーを入力してください。"));
+          "API キーが未設定のため、端末内で簡易要約を作成します（無料・オフラインでも使えます）。Claude による詳しい要約を使うには、",
+          h("a", { href: "#/settings" }, "設定"), "で Anthropic API キーを入力してください。"));
       }
       if (!hasTranscript) {
         panel.append(h("div", { class: "empty" }, h("p", { class: "muted" }, "要約するには、先に文字起こしが必要です。")));
@@ -347,12 +358,23 @@ export function renderDetail(root: HTMLElement, ctx: AppContext, id: string): ()
         body.classList.add("streaming");
       } else if (rec.summary) {
         body.innerHTML = linkTimestamps(markdownToHtml(rec.summary.text));
-        panel.append(body, h("p", { class: "summary-meta muted" }, `Claude（${rec.summary.model}）・ ${formatDateTime(rec.summary.createdAt)}`));
+        panel.append(body, h("p", { class: "summary-meta muted" }, `${summaryLabel(rec)}・ ${formatDateTime(rec.summary.createdAt)}`));
         return;
       } else {
-        body.append(h("p", { class: "muted" }, "「要約する」を押すと、概要・主なポイント・決定事項・ToDo をタイムスタンプ付きでまとめます。"));
+        body.append(h("p", { class: "muted" }, useClaude
+          ? "「要約する」を押すと、Claude が概要・主なポイント・決定事項・ToDo をタイムスタンプ付きでまとめます。"
+          : "「簡易要約を作成」を押すと、文字起こしから重要そうな発言・決定事項・ToDo をタイムスタンプ付きで抜き出します。"));
       }
       panel.append(body);
+    }
+
+    async function runLocalSummary() {
+      rec.summary = { text: localSummary(rec, mode()), kind: "local", model: LOCAL_SUMMARY_LABEL, createdAt: Date.now() };
+      tab = "summary";
+      await save();
+      if (!alive) return;
+      toast("簡易要約を作成しました", "success");
+      renderAll();
     }
 
     async function runSummary() {
@@ -387,7 +409,7 @@ export function renderDetail(root: HTMLElement, ctx: AppContext, id: string): ()
           },
         });
         if (!alive) return;
-        rec.summary = { text, model: SUMMARY_MODEL, createdAt: Date.now(), instruction: instruction.trim() || undefined };
+        rec.summary = { text, kind: "claude", model: SUMMARY_MODEL, createdAt: Date.now(), instruction: instruction.trim() || undefined };
         await save();
         toast("要約が完了しました", "success");
       } catch (e) {

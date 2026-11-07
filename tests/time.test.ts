@@ -28,6 +28,9 @@ describe("time formatting", () => {
     expect(formatDurationJa(42)).toBe("42秒");
     expect(formatDurationJa(125)).toBe("2分5秒");
     expect(formatDurationJa(3725)).toBe("1時間2分5秒");
+    expect(formatDurationJa(600)).toBe("10分");
+    expect(formatDurationJa(3605)).toBe("1時間5秒");
+    expect(formatDurationJa(0)).toBe("0秒");
   });
 
   it("adds paused time back when converting to wall-clock time", () => {

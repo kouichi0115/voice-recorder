@@ -59,9 +59,11 @@ export function formatDurationJa(seconds: number): string {
   const h = Math.floor(total / 3600);
   const m = Math.floor((total % 3600) / 60);
   const s = total % 60;
-  if (h > 0) return `${h}時間${m}分${s}秒`;
-  if (m > 0) return `${m}分${s}秒`;
-  return `${s}秒`;
+  let out = "";
+  if (h > 0) out += `${h}時間`;
+  if (m > 0) out += `${m}分`;
+  if (s > 0 || total === 0) out += `${s}秒`;
+  return out;
 }
 
 /** 表示モードに応じたタイムスタンプ文字列を作る関数を返す。 */

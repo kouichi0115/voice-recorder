@@ -1,4 +1,5 @@
 import type { Recording, TimestampMode } from "../../types";
+import { LOCAL_SUMMARY_LABEL } from "../localSummary";
 import { markdownToPlain } from "../markdown";
 import { formatDateTime, formatDurationJa, formatSrtTime } from "../time";
 import { markerLines, normalizeSegments, transcriptLines } from "../transcript";
@@ -9,12 +10,19 @@ const SOURCE_LABEL: Record<Recording["transcriptSource"], string> = {
   whisper: "OpenAI Whisper",
 };
 
+export function summaryLabel(rec: Recording): string {
+  if (!rec.summary) return "";
+  return rec.summary.kind === "local" ? LOCAL_SUMMARY_LABEL : `Claude（${rec.summary.model}）`;
+}
+
 export function metaLines(rec: Recording): [string, string][] {
-  return [
+  const lines: [string, string][] = [
     ["録音日時", formatDateTime(rec.createdAt)],
     ["録音時間", formatDurationJa(rec.duration)],
     ["文字起こし", SOURCE_LABEL[rec.transcriptSource]],
   ];
+  if (rec.summary) lines.push(["要約", summaryLabel(rec)]);
+  return lines;
 }
 
 /** Markdown ドキュメント（要約・マーカー・タイムスタンプ付き文字起こし）。 */
