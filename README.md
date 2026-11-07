@@ -1,0 +1,76 @@
+# ボイスレコーダー
+
+スマホ・PC のブラウザで使える、文字起こし・要約つきのボイスレコーダーです。
+インストール不要で、ホーム画面に追加すればアプリのように使えます。
+
+## できること
+
+| 機能 | 内容 |
+| --- | --- |
+| 録音 | 一時停止・再開、入力レベル表示、録音中の画面スリープ防止 |
+| タイムスタンプ | 文字起こしの各行・マーカーに時刻を付与。「経過時間（00:12:34）」と「時刻（14:03:21）」を切り替え可能 |
+| マーカー | 録音中・再生中に重要な場面へ印とメモを付けられる |
+| 文字起こし | ①録音しながらリアルタイム（ブラウザ標準の音声認識・無料） ②録音後に高精度（OpenAI Whisper・任意） |
+| 要約 | Claude（Anthropic）が「概要・主なポイント・決定事項・ToDo」をタイムスタンプ付きで作成。追加の指示も可 |
+| ドキュメント出力 | Word（.docx）・Markdown・テキスト・字幕（.srt）・音声ファイル。スマホでは共有シートから他のアプリへ送れる |
+| その他 | タイムスタンプをタップするとその位置から再生、再生中の行をハイライト、文字起こしの手直し、検索、ダークモード |
+
+## 使い方
+
+1. 公開ページを開く（下の「公開方法」参照）。スマホではブラウザのメニューから「ホーム画面に追加」すると便利です。
+2. **設定** で API キーを入力する
+   - **Anthropic API キー**（要約に必要）: [Claude Console](https://platform.claude.com/) で発行
+   - **OpenAI API キー**（任意・高精度な文字起こし用）: [OpenAI Platform](https://platform.openai.com/api-keys) で発行
+3. **録音** タブの赤いボタンで録音開始。重要な場面では「マーカー」をタップ。
+4. 停止すると自動で保存され、詳細画面が開きます。
+   - 「Whisperで文字起こし」で高精度な文字起こし
+   - 「要約する」で Claude が要約
+   - 「ドキュメントに出力」で Word などに保存・共有
+
+## 公開方法（GitHub Pages）
+
+1. GitHub のリポジトリで **Settings → Pages → Source** を **GitHub Actions** にする
+2. **Actions → Test & Deploy → Run workflow** を実行（以降はデフォルトブランチへの push で自動公開）
+3. `https://<ユーザー名>.github.io/voice-recorder/` で開けます
+
+マイクは HTTPS でしか使えないため、スマホで使うときは GitHub Pages などの HTTPS で公開されたページを開いてください。
+
+## データとプライバシー
+
+- 録音・文字起こし・要約は **端末のブラウザ内（IndexedDB）にだけ** 保存されます。サーバーはありません。
+- API キーもブラウザ内（localStorage）に保存され、Anthropic / OpenAI へ直接送信されます。共用の端末では入力しないでください。
+- ブラウザのサイトデータを消すと録音も消えます。大事な録音はドキュメントや音声ファイルとして書き出してください。
+
+## 対応ブラウザと注意点
+
+- 録音: 最新の Chrome / Edge / Safari / Firefox
+- リアルタイム文字起こし: Chrome / Edge / Safari（Firefox は非対応）。認識はブラウザ提供のサービスで行われるため、ネット接続が必要です。
+- 一部の Android 端末では、録音とリアルタイム文字起こしを同時に使うと片方がうまく動かないことがあります。その場合は録音画面でリアルタイム文字起こしをオフにし、録音後に Whisper を使ってください。
+- Whisper は 1 分あたり約 0.006 ドル、要約は録音の長さに応じて数円〜数十円程度の API 料金がかかります（各社の料金表をご確認ください）。
+- 25MB を超える長い録音は、自動的に 10 分ごとに分割して Whisper に送ります。
+
+## 開発
+
+```bash
+npm install
+npm run dev      # 開発サーバー（http://localhost:5173）
+npm test         # ユニットテスト
+npm run build    # 型チェック + 本番ビルド（dist/）
+```
+
+### 構成
+
+```
+src/
+  main.ts                  画面の切り替え（#/record, #/list, #/rec/:id, #/settings）
+  views/                   各画面（録音・一覧・詳細・設定）
+  lib/recorder.ts          MediaRecorder による録音（一時停止・経過時間・レベル）
+  lib/liveTranscriber.ts   Web Speech API によるリアルタイム文字起こし
+  lib/session.ts           録音中の状態（タブを切り替えても録音が続く）
+  lib/whisper.ts           OpenAI Whisper による文字起こし（長い音声は分割）
+  lib/summarize.ts         Claude による要約（ストリーミング表示）
+  lib/export/              Word・Markdown・テキスト・SRT 出力
+  lib/db.ts                IndexedDB への保存
+public/                    PWA 用のマニフェスト・アイコン・サービスワーカー
+tests/                     ユニットテスト（Vitest）
+```
